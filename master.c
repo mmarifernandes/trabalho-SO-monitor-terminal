@@ -11,6 +11,10 @@
 const int N = 300;
 int child_pid = -1;
 
+float creditos = 0.0;
+const float CUSTO_CPU_POR_SEGUNDO = 2.0;
+const float CUSTO_MEMORIA_POR_KB = 0.01;
+
 void timeout_handler(int sig)
 {
     if (child_pid > 0)
@@ -24,40 +28,70 @@ int main()
 {
     float quota;
     float timeout;
-    int maxmemoria;
+    float maxmemoria;
     char nome[N];
     float resto_quota;
+    float resto_memoria;
+
+    printf("Bem vindo ao programa de monitoramento de processos!\n");
+
+    printf("    ________  ________\n");
+    printf("   / ____/  |/  / ___/\n");
+    printf("  / /_  / /|_/ /\\__ \\ \n");
+    printf(" / __/ / /  / /___/ / \n");
+    printf("/_/   /_/  /_//____/\n\n");
+
+    // Adicionar créditos
+    printf("Digite a quantidade inicial de créditos: ");
+    if (scanf("%f", &creditos) != 1 || creditos < 0.0) return 1;
 
     // Coleta única das configurações
     printf("Digite a quota de computação em segundos: ");
-    scanf("%f", &quota);
+    if (scanf("%f", &quota) != 1) return 1;
 
     printf("Digite o tempo limite em segundos: ");
-    scanf("%f", &timeout);
+    if (scanf("%f", &timeout) != 1) return 1;
 
     printf("Digite o máximo de memória (em KB): ");
-    scanf("%d", &maxmemoria);
+    if (scanf("%f", &maxmemoria) != 1) return 1;
     getchar(); // Limpa o \n deixado pelo último scanf
 
-    while (1){
-        printf("\nDigite o nome do binário a ser executado (ou '0' para sair): ");
-        fgets(nome, N, stdin);
+    while (1)
+    {
+        printf("\nCréditos disponíveis: %.2f\n", creditos);
+        printf("Digite o nome do binário a ser executado (ou '0' para sair): ");
+        if (!fgets(nome, N, stdin)) break;
         nome[strcspn(nome, "\n")] = 0;
 
-        if (strcmp(nome, "0") == 0){
+        if (strcmp(nome, "0") == 0)
+        {
             printf("Encerrando o programa.\n");
+            if (child_pid > 0)
+            {
+                kill(child_pid, SIGKILL);
+                waitpid(child_pid, NULL, 0);
+            }
+            break;
+        }
+
+        if (creditos <= 0.0)
+        {
+            printf("\nVocê não possui créditos suficientes para executar mais programas.\n");
             break;
         }
 
         time_t inicio_exec = time(NULL);
 
         int pid = fork();
-        if (pid == 0){
-            execlp(nome, nome, (char *)NULL);
+        if (pid == 0)
+        {
+            char *argv[] = {nome, NULL};
+            execvp(nome, argv);
             perror("Erro ao executar o comando");
-            //exit(EXIT_FAILURE);
+            exit(127);
         }
-        else if (pid > 0){
+        else if (pid > 0)
+        {
             child_pid = pid;
             signal(SIGALRM, timeout_handler);
             alarm((unsigned int)timeout);
@@ -67,44 +101,87 @@ int main()
             float soma;
 
             waitpid(pid, &status, 0);
-            alarm(0); // Cancela o alarme se o processo terminar antes do timeout
+            alarm(0);
+            child_pid = -1;
 
-            if (getrusage(RUSAGE_CHILDREN, &usage) == 0){
-                printf("\n=== Uso de CPU ===\n");
-                printf("Modo usuário: %ld.%06ld segundos\n",
+            if (WIFEXITED(status) && WEXITSTATUS(status) == 127)
+            {
+                printf("O binário '%s' não foi encontrado ou não pôde ser executado.\n", nome);
+                continue;
+            }
+
+            if (getrusage(RUSAGE_CHILDREN, &usage) == 0)
+            {
+                printf("\n╔══════════════════════════════════════╗");
+                printf("\n║              USO DE CPU              ║");
+                printf("\n╠══════════════════════════════════════╣");
+                printf("\n║ Modo usuário: %ld.%06ld segundos      ║",
                        usage.ru_utime.tv_sec, usage.ru_utime.tv_usec);
-                printf("Modo sistema: %ld.%06ld segundos\n",
+                printf("\n║ Modo sistema: %ld.%06ld segundos      ║",
                        usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
-                printf("=================\n");
-
                 soma = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1000000.0 +
                        usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0;
                 resto_quota = quota - soma;
+                resto_memoria = maxmemoria - usage.ru_maxrss;
+                printf("\n║ Tempo total: %.6f segundos       ║", soma);
 
-                printf("Soma dos tempos de CPU (usuário + sistema): %.6f segundos\n", soma);
+                float custo_cpu = soma * CUSTO_CPU_POR_SEGUNDO;
+                float custo_memoria = usage.ru_maxrss * CUSTO_MEMORIA_POR_KB;
+                float custo_total = custo_cpu + custo_memoria;
 
-                if (resto_quota < 0){
-                    printf("O tempo de execução excedeu a quota de CPU.\n");
-                    kill(pid, SIGKILL);
-                }
-                else{
-                    printf("Restam %.6f segundos da quota de CPU.\n", resto_quota);
-                }
-
-                printf("Memória máxima utilizada: %ld KB\n", usage.ru_maxrss);
-                if (usage.ru_maxrss > maxmemoria){
-                    printf("A memória utilizada excedeu o máximo permitido de: %d KBs\n", maxmemoria);
-                    kill(pid, SIGKILL);
+                if (custo_total > creditos)
+                {
+                    printf("\n╠══════════════════════════════════════╣");
+                    printf("\n║ Créditos insuficientes!              ║");
+                    printf("\n║ Necessário: %.2f | Disponível: %.2f   ║", custo_total, creditos);
+                    printf("\n╚══════════════════════════════════════╝\n");
+                    printf("Encerrando o programa.\n");
                     exit(1);
                 }
-                else{
-                    printf("A memória utilizada está dentro do limite.\n");
+
+                creditos -= custo_total;
+
+                printf("\n║ Tempo restante: %.6f segundos    ║", resto_quota);
+                printf("\n╚══════════════════════════════════════╝");
+
+                printf("\n╔════════════════════════════════╗");
+                printf("\n║         USO DE MEMÓRIA         ║");
+                printf("\n╠════════════════════════════════╣");
+                printf("\n║ Memória usada:     %ld KB    ║", usage.ru_maxrss);
+                printf("\n║ Memória limite:    %.0f KB    ║", maxmemoria);
+
+                if (usage.ru_maxrss > maxmemoria)
+                {
+                    printf("\n║ Memória restante: %.0f      ║", resto_memoria);
+                    printf("\n║ Excedeu o limite de memória!   ║");
+                    printf("\n╚════════════════════════════════╝\n");
+                    printf("Encerrando o programa.\n");
+                    exit(1);
+                }
+                else
+                {
+                    printf("\n║ Memória restante:   %.0f KB   ║", resto_memoria);
+                    printf("\n╚════════════════════════════════╝");
                 }
 
+                printf("\n╔════════════════════════════════════╗");
+                printf("\n║           CUSTO DA EXECUÇÃO        ║");
+                printf("\n╠════════════════════════════════════╣");
+                printf("\n║ CPU:     %.2f                      ║", custo_cpu);
+                printf("\n║ Memória: %.2f                     ║", custo_memoria);
+                printf("\n║ Total:   %.2f                     ║", custo_total);
+                printf("\n║ Créditos restantes: %.2f          ║", creditos);
+                printf("\n╚════════════════════════════════════╝");
+
                 time_t fim_exec = time(NULL);
-                printf("Tempo decorrido: %ld segundos\n", fim_exec - inicio_exec);
+                printf("\n╔══════════════════════════════╗");
+                printf("\n║ TEMPO TOTAL DE EXECUÇÃO      ║");
+                printf("\n╠══════════════════════════════╣");
+                printf("\n║ Tempo decorrido:  %ld segundos ║", fim_exec - inicio_exec);
+                printf("\n╚══════════════════════════════╝\n");
             }
-            else{
+            else
+            {
                 perror("Erro ao obter uso de CPU");
             }
         }

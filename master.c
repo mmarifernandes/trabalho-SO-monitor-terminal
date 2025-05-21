@@ -136,7 +136,7 @@ int main()
                     printf("\n║ Necessário: %.2f | Disponível: %.2f   ║", custo_total, creditos);
                     printf("\n╚══════════════════════════════════════╝\n");
                     printf("Encerrando o programa.\n");
-                    exit(1);
+                    break;
                 }
 
                 creditos -= custo_total;
@@ -156,7 +156,7 @@ int main()
                     printf("\n║ Excedeu o limite de memória!   ║");
                     printf("\n╚════════════════════════════════╝\n");
                     printf("Encerrando o programa.\n");
-                    exit(1);
+                    break;
                 }
                 else
                 {
@@ -190,6 +190,6 @@ int main()
             perror("Erro ao criar processo");
         }
     }
-
+    getchar();
     return 0;
 }

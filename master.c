@@ -41,11 +41,9 @@ int main()
     printf(" / __/ / /  / /___/ / \n");
     printf("/_/   /_/  /_//____/\n\n");
 
-    // Adicionar créditos
     printf("Digite a quantidade inicial de créditos: ");
     if (scanf("%f", &creditos) != 1 || creditos < 0.0) return 1;
 
-    // Coleta única das configurações
     printf("Digite a quota de computação em segundos: ");
     if (scanf("%f", &quota) != 1) return 1;
 
@@ -54,7 +52,7 @@ int main()
 
     printf("Digite o máximo de memória (em KB): ");
     if (scanf("%f", &maxmemoria) != 1) return 1;
-    getchar(); // Limpa o \n deixado pelo último scanf
+    getchar();
 
     while (1)
     {

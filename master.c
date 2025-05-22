@@ -15,17 +15,14 @@ float creditos = 0.0;
 const float CUSTO_CPU_POR_SEGUNDO = 2.0;
 const float CUSTO_MEMORIA_POR_KB = 0.01;
 
-void timeout_handler(int sig)
-{
-    if (child_pid > 0)
-    {
+void timeout_handler(int sig){
+    if (child_pid > 0){
         printf("\nTempo limite excedido! Encerrando o processo filho.\n");
         kill(child_pid, SIGKILL);
     }
 }
 
-int main()
-{
+int main(){
     float quota;
     float timeout;
     float maxmemoria;
@@ -54,15 +51,13 @@ int main()
     if (scanf("%f", &maxmemoria) != 1) return 1;
     getchar();
 
-    while (1)
-    {
+    while (1){
         printf("\nCréditos disponíveis: %.2f\n", creditos);
         printf("Digite o nome do binário a ser executado (ou '0' para sair): ");
         if (!fgets(nome, N, stdin)) break;
         nome[strcspn(nome, "\n")] = 0;
 
-        if (strcmp(nome, "0") == 0)
-        {
+        if (strcmp(nome, "0") == 0){
             printf("Encerrando o programa.\n");
             if (child_pid > 0)
             {
@@ -72,8 +67,7 @@ int main()
             break;
         }
 
-        if (creditos <= 0.0)
-        {
+        if (creditos <= 0.0){
             printf("\nVocê não possui créditos suficientes para executar mais programas.\n");
             break;
         }
@@ -81,15 +75,13 @@ int main()
         time_t inicio_exec = time(NULL);
 
         int pid = fork();
-        if (pid == 0)
-        {
+        if (pid == 0){
             char *argv[] = {nome, NULL};
             execvp(nome, argv);
             perror("Erro ao executar o comando");
             exit(127);
         }
-        else if (pid > 0)
-        {
+        else if (pid > 0){
             child_pid = pid;
             signal(SIGALRM, timeout_handler);
             alarm((unsigned int)timeout);
@@ -102,45 +94,47 @@ int main()
             alarm(0);
             child_pid = -1;
 
-            if (WIFEXITED(status) && WEXITSTATUS(status) == 127)
-            {
+            if (WIFEXITED(status) && WEXITSTATUS(status) == 127){
                 printf("O binário '%s' não foi encontrado ou não pôde ser executado.\n", nome);
                 continue;
             }
 
-            if (getrusage(RUSAGE_CHILDREN, &usage) == 0)
-            {
+            if (getrusage(RUSAGE_CHILDREN, &usage) == 0){
                 printf("\n╔══════════════════════════════════════╗");
                 printf("\n║              USO DE CPU              ║");
                 printf("\n╠══════════════════════════════════════╣");
-                printf("\n║ Modo usuário: %ld.%06ld segundos      ║",
-                       usage.ru_utime.tv_sec, usage.ru_utime.tv_usec);
-                printf("\n║ Modo sistema: %ld.%06ld segundos      ║",
-                       usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
-                soma = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1000000.0 +
-                       usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0;
+                printf("\n║ Modo usuário: %ld.%06ld segundos      ║", usage.ru_utime.tv_sec, usage.ru_utime.tv_usec);
+                printf("\n║ Modo sistema: %ld.%06ld segundos      ║", usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
+
+                soma = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1000000.0 + usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0;
                 resto_quota = quota - soma;
                 resto_memoria = maxmemoria - usage.ru_maxrss;
+               
                 printf("\n║ Tempo total: %.6f segundos       ║", soma);
 
                 float custo_cpu = soma * CUSTO_CPU_POR_SEGUNDO;
                 float custo_memoria = usage.ru_maxrss * CUSTO_MEMORIA_POR_KB;
                 float custo_total = custo_cpu + custo_memoria;
 
-                if (custo_total > creditos)
-                {
-                    printf("\n╠══════════════════════════════════════╣");
+                printf("\n║ Tempo restante: %.6f segundos      ║", resto_quota);
+                
+                if(resto_quota <= 0.0){
+                    printf("\n║ Tempo limite excedido!             ║");
+                    printf("\n╚════════════════════════════════════╝\n");
+                }
+                else{
+                    printf("\n╚════════════════════════════════════╝");
+                }
+
+                if (custo_total > creditos){
+                    printf("\n╔══════════════════════════════════════╗");
                     printf("\n║ Créditos insuficientes!              ║");
                     printf("\n║ Necessário: %.2f | Disponível: %.2f   ║", custo_total, creditos);
                     printf("\n╚══════════════════════════════════════╝\n");
-                    printf("Encerrando o programa.\n");
-                    break;
+
                 }
 
                 creditos -= custo_total;
-
-                printf("\n║ Tempo restante: %.6f segundos    ║", resto_quota);
-                printf("\n╚══════════════════════════════════════╝");
 
                 printf("\n╔════════════════════════════════╗");
                 printf("\n║         USO DE MEMÓRIA         ║");
@@ -148,16 +142,13 @@ int main()
                 printf("\n║ Memória usada:     %ld KB    ║", usage.ru_maxrss);
                 printf("\n║ Memória limite:    %.0f KB    ║", maxmemoria);
 
-                if (usage.ru_maxrss > maxmemoria)
-                {
+                if (usage.ru_maxrss > maxmemoria){
                     printf("\n║ Memória restante: %.0f      ║", resto_memoria);
                     printf("\n║ Excedeu o limite de memória!   ║");
                     printf("\n╚════════════════════════════════╝\n");
-                    printf("Encerrando o programa.\n");
-                    break;
+
                 }
-                else
-                {
+                else{
                     printf("\n║ Memória restante:   %.0f KB   ║", resto_memoria);
                     printf("\n╚════════════════════════════════╝");
                 }
@@ -172,21 +163,46 @@ int main()
                 printf("\n╚════════════════════════════════════╝");
 
                 time_t fim_exec = time(NULL);
+
                 printf("\n╔══════════════════════════════╗");
                 printf("\n║ TEMPO TOTAL DE EXECUÇÃO      ║");
                 printf("\n╠══════════════════════════════╣");
                 printf("\n║ Tempo decorrido:  %ld segundos ║", fim_exec - inicio_exec);
                 printf("\n╚══════════════════════════════╝\n");
             }
-            else
-            {
-                perror("Erro ao obter uso de CPU");
+
+            if(usage.ru_maxrss > maxmemoria || resto_quota <= 0.0 || creditos <= 0.0){
+                printf("\n╔══════════════════════════════════════╗");
+                printf("\n║         FIM DO PROGRAMA              ║");
+                printf("\n╚══════════════════════════════════════╝\n");
+                printf("Encerrando o programa \n");
+                if(resto_quota <= 0.0 && usage.ru_maxrss > maxmemoria && creditos <= 0.0){
+                    printf("A quota de cpu foi excedida, a memória máxima foi excedida e os créditos foram esgotados.\n");
+                }
+                else if(resto_quota <= 0.0 && usage.ru_maxrss > maxmemoria){
+                    printf("A quota de cpu foi excedida e a memória máxima foi excedida.\n");
+                }
+                else if( resto_quota <= 0.0 && creditos <= 0.0){
+                    printf("A quota de cpu foi excedida e os créditos foram esgotados.\n");
+                }
+                else if(usage.ru_maxrss > maxmemoria && creditos <= 0.0){
+                    printf("A memória máxima foi excedida e os créditos foram esgotados.\n");
+                }
+                else if(resto_quota <= 0.0){
+                    printf("A quota de cpu foi excedida.\n");
+                }
+                else if(usage.ru_maxrss > maxmemoria){
+                    printf("A memória máxima foi excedida.\n");
+                }
+                else if(creditos <= 0.0){
+                    printf("Os créditos foram esgotados.\n");
+                }
+               
+                break;
             }
+
         }
-        else
-        {
-            perror("Erro ao criar processo");
-        }
+
     }
     getchar();
     return 0;
